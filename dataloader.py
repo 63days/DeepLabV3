@@ -30,9 +30,10 @@ class BoneDataset(Dataset):
             img = self.transform(img)
             label = self.transform(label)
 
-        label = label.long()
-        label_onehot = torch.zeros(2, label.size(1), label.size(2)).scatter_(0, label, 1)
-        sample = (img, label_onehot)
+        label = label.long().float()
+        sample = (img, label)
+        #label_onehot = torch.zeros(2, label.size(1), label.size(2)).scatter_(0, label, 1)
+        #sample = (img, label_onehot)
 
         return sample
 
@@ -58,7 +59,7 @@ class DataSetWrapper(object):
     def _bone_transform(self):
         data_transforms = transforms.Compose([
             SquarePad(),
-            transforms.Resize((512, 512)),
+            transforms.Resize((572, 572)),
             transforms.ToTensor()
         ])
         return data_transforms
