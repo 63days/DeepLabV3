@@ -36,9 +36,9 @@ def get_IOU(pred, label, threshold=0.5, eps=1e-5):
     label_True = (label == 1)
     label_False = ~label_True
 
-    TP = torch.logical_and(pred_True, label_True).float().sum()
-    FN = torch.logical_and(pred_False, label_True).float().sum()
-    FP = torch.logical_and(pred_True, label_False).float().sum()
+    TP = (pred_True & label_True).float().sum()
+    FN = (pred_False & label_True).float().sum()
+    FP = (pred_True & label_False).float().sum()
 
     IOU = TP / (TP + FN + FP)
 
