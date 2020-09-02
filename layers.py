@@ -1,0 +1,38 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DepthWiseConv(nn.Module):
+    def __init__(self, channels, kernel_size, stride, padding, padding_mode, dilation, bias):
+        '''
+        In Depth-Wise Conv, in_channels and out_channels are same.
+        channel-wise convoution.
+        '''
+        super().__init__()
+        self.depthwise_conv = nn.Conv2d(channels, channels, kernel_size, stride,
+                                        padding=padding, dilation=dilation,
+                                        groups=channels, bias=bias, padding_mode=padding_mode)
+
+    def forward(self, x):
+        return self.depthwise_conv(x)
+
+class PointWiseConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(PointWiseConv, self).__init__()
+        self.pointwise_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        return self.pointwise_conv(x)
+
+class DepthWiseSeparableConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, padding_mode,
+                 dilation, bias):
+        super(DepthWiseSeparableConv, self).__init__()
+        self.depthwise_conv = DepthWiseConv(in_channels, kernel_size, stride, padding,
+                                            padding_mode, dilation, bias)
+        self.pointwise_conv = PointWiseConv(in_channels, out_channels)
+
+    def forward(self, x):
+        x = self.depthwise_conv(x)
+        x = self.pointwise_conv(x)
+        return x
