@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from utils import CenterCrop, Padding
 
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class Unet(nn.Module):
     def __init__(self, input_dim=1):
@@ -37,6 +38,7 @@ class Unet(nn.Module):
 
         return x
 
+
 class Down(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -55,14 +57,15 @@ class Up(nn.Module):
         self.convs = DoubleConv(in_channels, out_channels)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.ch_extract = nn.Linear(in_channels, out_channels)
+        self.pad = Padding()
 
     def forward(self, bottom_x, skip_x):
         bottom_x = self.upsample(bottom_x) #[B, C, H, W]
         bottom_x = bottom_x.permute((0,2,3,1)) #[B, H, W, C]
         bottom_x = self.ch_extract(bottom_x).permute((0, 3, 1, 2)) #[B, C/2, H, W]
-
-        S = bottom_x.size(2)
-        skip_x = CenterCrop()(skip_x, S)
+        # bottom_x < skip_x
+        S = skip_x.size(3)
+        bottom_x = self.pad(bottom_x, S)
 
         concate_x = torch.cat([skip_x, bottom_x], dim=1)
         return self.convs(concate_x)
@@ -83,13 +86,5 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-class CenterCrop(object):
-    def __call__(self, x, S):
-        W = x.size(2)
-        off = W - S
-        start = math.ceil(off/2)
-        end = math.floor(off/2)
 
-        # 3-> 1, 2 4-> 2, 2  x-> x/2 버림 x/2올림
-        return x[:, :, start:-end, start:-end]
 
