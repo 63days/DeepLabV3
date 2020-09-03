@@ -9,6 +9,7 @@ from utils import get_IOU, Padding
 def main(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    ### Hyperparameters Setting ###
     epochs = args.epochs
     batch_size = args.batch_size
     num_workers = args.num_workers
@@ -18,25 +19,34 @@ def main(args):
     separable = args.separable
     method = args.method
 
+    ### DataLoader ###
     dataset = DataSetWrapper(batch_size, num_workers, valid_ratio, test_ratio)
     train_dl, valid_dl, test_dl = dataset.get_data_loaders()
 
+    ### Model: U-Net ###
     model = Unet(input_dim=1, separable=separable, method=method)
+    model.summary()
     model = nn.DataParallel(model).to(device)
-
+    
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_dl), eta_min=0,
                                                      last_epoch=-1)
     criterion = nn.BCEWithLogitsLoss()
     train_losses = []
     val_losses = []
+
+    ###Train & Validation start ###
     mIOU_list = []
     best_mIOU = 0.
     step = 0
+
     for epoch in range(epochs):
+
+        ### train ###
         pbar = tqdm(train_dl)
         model.train()
         losses = []
+
         for (img, label) in pbar:
             optimizer.zero_grad()
             img, label = img.to(device), label.to(device)
@@ -52,6 +62,7 @@ def main(args):
             losses = sum(losses) / len(losses)
             train_losses.append(losses)
 
+        ### validation ###
         with torch.no_grad():
             model.eval()
             mIOU = []
@@ -74,6 +85,7 @@ def main(args):
 
             print(f'VL: {loss.item():.4f} | mIOU: {100 * mIOU:.1f}%')
 
+        ### Early Stopping ###
         if mIOU > best_mIOU:
             best_mIOU = mIOU
             save_state = {

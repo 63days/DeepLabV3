@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import math
 from utils import CenterCrop, Padding
 from layers import *
+from prettytable import PrettyTable
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -38,6 +39,18 @@ class Unet(nn.Module):
         x = self.outconv(x)
 
         return x
+
+    def summary(self):
+        table = PrettyTable(["Modules", "Parameters"])
+        total_params = 0
+        for name, parameter in self.named_parameters():
+            if not parameter.requires_grad: continue
+            param = parameter.numel()
+            table.add_row([name, param])
+            total_params += param
+        print(table)
+        print(f"Total Trainable Params: {total_params}")
+        return total_params
 
 
 class Down(nn.Module):
