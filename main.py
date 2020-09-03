@@ -85,7 +85,7 @@ def main(args):
                 'val_losses': val_losses,
                 'best_mIOU': best_mIOU
             }
-            torch.save(save_state, f'./checkpoint/best_model.ckpt')
+            torch.save(save_state, f'./checkpoint/{method}_{separable}_best_model.ckpt')
             step = 0
         else:
             step += 1
