@@ -15,11 +15,13 @@ def main(args):
     valid_ratio = args.valid_ratio
     test_ratio = args.test_ratio
     threshold = args.threshold
+    separable = args.separable
+    method = args.method
 
     dataset = DataSetWrapper(batch_size, num_workers, valid_ratio, test_ratio)
     train_dl, valid_dl, test_dl = dataset.get_data_loaders()
 
-    model = Unet(1)
+    model = Unet(input_dim=1, separable=separable, method=method)
     model = nn.DataParallel(model).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -113,7 +115,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--patience',
         type=int,
-        default=200
+        default=200,
+        help='Early Stopping Criteria'
     )
     parser.add_argument(
         '--valid_ratio',
@@ -138,7 +141,21 @@ if __name__ == '__main__':
     parser.add_argument(
         '--threshold',
         type=float,
-        default=0.5
+        default=0.5,
+        help='Threshold for pixel value of predicted image'
+    )
+    parser.add_argument(
+        '--separable',
+        action='store_true',
+        default=False,
+        help='Using Depth-Wise Separable Conv'
+    )
+    parser.add_argument(
+        '--method',
+        type=str,
+        default='upsample',
+        choices=['upsample', 'transpose'],
+        help='Upsample Method'
     )
     args = parser.parse_args()
     main(args)
