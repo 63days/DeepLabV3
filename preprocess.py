@@ -7,64 +7,54 @@ from PIL import Image
 import torchvision.transforms.functional as TF
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+import pickle
 
 def main():
-    img_list = np.genfromtxt('./dataset/filelist.txt', dtype=str)
+    img_list = np.genfromtxt('./dataset/image_list.txt', dtype=str)
 
 
     for img_name in img_list:
         img = Image.open('./dataset/images/original/'+img_name).convert('L')
         label = Image.open('./dataset/images/label/'+img_name).convert('L')
+        sample = (img, label)
 
-        augmentation_save((img, label)) #[10, C, H, W]
+        img_name = img_name[:-4]
+        ### original image tensor data ###
+        sample = pad_resize(sample, 512)
+        ori_sample = to_tensor(sample)
+        with open(f'./dataset/tensor/{img_name}.pkl', 'wb') as f:
+            pickle.dump(ori_sample, f)
+        ##################################
+
+        ### augment image tensor data ###
+        for i in range(9):
+            aug_sample = random_rotate(sample)
+            aug_sample = random_resized_crop(aug_sample)
+            aug_sample = to_tensor(aug_sample)
+            with open(f'./dataset/tensor/{img_name}_{i}.pkl', 'wb') as f:
+                pickle.dump(aug_sample, f)
+        ##################################
 
 
-
-
-
-
-
-def augmentation_save(sample, img_name): #sample: (img, label)
+def pad_resize(sample, S=512):
     img, label = sample
-    img_name = img_name[:-4]
+    img, label = SquarePad()(img), SquarePad()(label)
+    img, label = transforms.Resize((S, S))(img), transforms.Resize((S, S))(label)
 
-    img_t = TF.to_tensor(img)
-    label_t = TF.to_tensor(label)
-    torch.save(img_t,'./dataset/tensor/original/'+img_name+'.ts')
-    torch.save(label_t,'./dataset/tensor/label/'+img_name+'.ts')
+    return img, label
 
-    img_list = []
-    label_list = []
-    img_list.append(img_t)
-    label_list.append(label_t)
-
-    pad_resize = transforms.Compose([
-        SquarePad(),
-        transforms.Resize((512, 512))
-    ])
-    img = pad_resize(img)
-    label = pad_resize(label)
-
+def random_rotate(sample):
     degrees = np.arange(3, 46, 3)
-    degree = np.random.choice(degrees, 9)
-    mask = 2 * np.random.randint(0, 2, 9) - 1
-    degree *= mask
+    d = np.random.choice(degrees)
+    if random.random() > 0.5:
+        d = -d
 
-    for i, d in enumerate(degree):
-        rot_img = TF.rotate(img, d, resample=Image.BILINEAR)
-        rot_label = TF.rotate(label, d, resample=Image.BILINEAR)
-        aug_img_name = img_name + f'_{str(i)}'
-        rot_img, rot_label = random_resized_crop((rot_img, rot_label))
+    img, label = sample
+    img = TF.rotate(img, d, resample=Image.BILINEAR)
+    label = TF.rotate(label, d, resample=Image.BILINEAR)
 
-        rot_img_t = TF.to_tensor(rot_img)
-        rot_label_t = TF.to_tensor(rot_label)
-
-        torch.save(rot_img_t, './dataset/tensor/original/' + aug_img_name + '.ts')
-        torch.save(rot_label_t, './dataset/tensor/label/' + aug_img_name + '.ts')
-
-
-
-
+    return img, label
 
 def random_resized_crop(sample):
     img, label = sample
@@ -80,12 +70,18 @@ def random_resized_crop(sample):
 
     h, w = np.random.choice(candidate, 2)
 
-    img = TF.resizedcrop(img, h, w, S_prime, S_prime, S)
-    label = TF.resizedcrop(label, h, w, S_prime, S_prime, S)
+    img = TF.resized_crop(img, h, w, S_prime, S_prime, S)
+    label = TF.resized_crop(label, h, w, S_prime, S_prime, S)
 
-    sample = (img, label)
+    return img, label
 
-    return sample
+def to_tensor(sample):
+    img, label = sample
+    img, label = TF.to_tensor(img), TF.to_tensor(label)
+
+    label = (label > 0.8).float()
+
+    return img, label
 
 if __name__ == '__main__':
     main()
