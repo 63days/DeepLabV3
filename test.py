@@ -9,13 +9,17 @@ from utils import Padding, get_IOU
 def main(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    down_method = args.down_method
+    up_method = args.up_method
+    separable = args.separable
+
     ds = DataSetWrapper(args.batch_size, 8, 0.2, 0.2)
-    _, _, test_dl = ds.get_data_loaders()
+    test_dl = ds.get_data_loaders(train=False)
 
     model = Unet(1, method=args.method, separable=args.separable)
     model = nn.DataParallel(model).to(device)
 
-    load_state = torch.load(f'./checkpoint/{args.method}_{args.separable}_best_model.ckpt')
+    load_state = torch.load(f'./checkpoint/{down_method}_{up_method}_{separable}.ckpt')
 
     model.load_state_dict(load_state['model_state_dict'])
     train_losses = load_state['train_losses']
@@ -68,7 +72,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=4
+        default=8
     )
     parser.add_argument(
         '--separable',
@@ -76,10 +80,16 @@ if __name__ == '__main__':
         default=False
     )
     parser.add_argument(
-        '--method',
+        '--up_method',
         type=str,
-        default='upsample',
-        choices=['upsample', 'transpose']
+        default='bilinear',
+        choices=['bilinear', 'transpose']
+    )
+    parser.add_argument(
+        '--down_method',
+        type=str,
+        default='maxpool',
+        choices=['maxpool', 'conv']
     )
     args = parser.parse_args()
     main(args)
