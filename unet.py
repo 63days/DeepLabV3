@@ -56,7 +56,7 @@ class Unet(nn.Module):
 class Down(nn.Module):
     def __init__(self, in_channels, out_channels, separable):
         super().__init__()
-        self.convs = DoubleConv(in_channels, out_channels, separab=separable)
+        self.convs = DoubleConv(in_channels, out_channels, separable=separable)
 
     def forward(self, x):
         x = F.max_pool2d(x, 2)
@@ -75,8 +75,11 @@ class Up(nn.Module):
                 PointWiseConv(in_channels, out_channels, bias=False)
             )
         elif method == 'transpose':
-            self.upsample = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2,
-                                               bias=False)
+            self.upsample = nn.Sequential(
+                nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2,
+                                   bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
 
         self.pad = Padding()
 
@@ -105,10 +108,10 @@ class DoubleConv(nn.Module):
             self.layers = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, 3),
                 nn.BatchNorm2d(out_channels),
-                nn.ReLU(),
+                nn.ReLU(inplace=True),
                 nn.Conv2d(out_channels, out_channels, 3),
                 nn.BatchNorm2d(out_channels),
-                nn.ReLU()
+                nn.ReLU(inplace=True)
             )
 
     def forward(self, x):

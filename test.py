@@ -12,10 +12,11 @@ def main(args):
     ds = DataSetWrapper(args.batch_size, 8, 0.2, 0.2)
     _, _, test_dl = ds.get_data_loaders()
 
-    model = Unet(1)
+    model = Unet(1, method=args.method, separable=args.separable)
     model = nn.DataParallel(model).to(device)
 
-    load_state = torch.load('./checkpoint/87.0mIOU.ckpt')
+    load_state = torch.load(f'./checkpoint/{args.method}_{args.separable}_best_model.ckpt')
+
     model.load_state_dict(load_state['model_state_dict'])
     train_losses = load_state['train_losses']
     val_losses = load_state['val_losses']
@@ -68,6 +69,17 @@ if __name__ == '__main__':
         '--batch_size',
         type=int,
         default=4
+    )
+    parser.add_argument(
+        '--separable',
+        action='store_true',
+        default=False
+    )
+    parser.add_argument(
+        '--method',
+        type=str,
+        default='upsample',
+        choices=['upsample', 'transpose']
     )
     args = parser.parse_args()
     main(args)

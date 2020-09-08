@@ -7,7 +7,9 @@ from torchvision import transforms, utils
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
 import torch.nn as nn
+import random
 import matplotlib.pyplot as plt
+import torchvision.transforms.functional as TF
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -27,8 +29,22 @@ class BoneDataset(Dataset):
 
         sample = (img, label)
         if self.transform:
+            #transforms.RandomHorizontalFlip(p=0.5),
+            #transforms.RandomRotation(degrees=45),
+            #transforms.ToTensor(),
+
             img = self.transform(img)
             label = self.transform(label)
+
+
+            degrees = np.arange(-30, 30)
+            degree = np.random.choice(degrees)
+
+            img = TF.rotate(img, degree)
+            label = TF.rotate(label, degree)
+
+            img = TF.to_tensor(img)
+            label = TF.to_tensor(label)
 
         label = label.long().float()
         sample = (img, label)
@@ -59,8 +75,8 @@ class DataSetWrapper(object):
     def _bone_transform(self):
         data_transforms = transforms.Compose([
             SquarePad(),
-            transforms.Resize((572, 572)),
-            transforms.ToTensor()
+            transforms.Resize((572, 572))
+            #transforms.Normalize([0.485], [0.229])
         ])
         return data_transforms
 

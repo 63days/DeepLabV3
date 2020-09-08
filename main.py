@@ -55,7 +55,7 @@ def main(args):
             loss = criterion(pred, label)
             loss.backward()
             optimizer.step()
-            losses.append(loss)
+            losses.append(loss.item())
             pbar.set_description(f'E: {epoch+1} | L: {loss.item():.4f} | lr: {scheduler.get_lr()[0]:.7f}')
         scheduler.step()
         if (epoch + 1) % 10:
@@ -83,7 +83,7 @@ def main(args):
                 losses = sum(losses) / len(losses)
                 val_losses.append(losses)
 
-            print(f'VL: {loss.item():.4f} | mIOU: {100 * mIOU:.1f}%')
+            print(f'VL: {loss.item():.4f} | mIOU: {100 * mIOU:.1f}% | best mIOU: {100 * best_mIOU:.1f}')
 
         ### Early Stopping ###
         if mIOU > best_mIOU:
