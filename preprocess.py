@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from dataloader import BoneDataset, SquarePad
 import os
 from torchvision import transforms
@@ -7,8 +6,7 @@ from PIL import Image
 import torchvision.transforms.functional as TF
 import random
 import numpy as np
-import matplotlib.pyplot as plt
-import pickle
+
 
 def main():
     img_list = np.genfromtxt('./dataset/image_list.txt', dtype=str)
@@ -23,8 +21,7 @@ def main():
         ### original image tensor data ###
         sample = pad_resize(sample, 512)
         ori_sample = to_tensor(sample)
-        with open(f'./dataset/tensor/{img_name}.pkl', 'wb') as f:
-            pickle.dump(ori_sample, f)
+        torch.save(ori_sample, f'./dataset/tensor/{img_name}.ts')
         ##################################
 
         ### augment image tensor data ###
@@ -32,9 +29,12 @@ def main():
             aug_sample = random_rotate(sample)
             aug_sample = random_resized_crop(aug_sample)
             aug_sample = to_tensor(aug_sample)
-            with open(f'./dataset/tensor/{img_name}_{i}.pkl', 'wb') as f:
-                pickle.dump(aug_sample, f)
+            torch.save(aug_sample, f'./dataset/tensor/{img_name}a{i}.ts')
         ##################################
+
+def split():
+    total_list = np.genfromtxt('./dataset/data_list.txt', dtype=str)
+    np.random.shuffle(total_list)
 
 
 def pad_resize(sample, S=512):
@@ -84,4 +84,15 @@ def to_tensor(sample):
     return img, label
 
 if __name__ == '__main__':
-    main()
+    total_list = np.genfromtxt('./dataset/data_list.txt', dtype=str)
+    np.random.shuffle(total_list)
+    indices = list(range(len(total_list)))
+    split = int(np.floor(0.2 * len(total_list)))
+    train_idx, test_idx = indices[split:], indices[:split]
+
+    train_list = total_list[train_idx]
+    test_list = total_list[test_idx]
+
+
+    np.savetxt('./dataset/train_list.txt', train_list, fmt='%s')
+    np.savetxt('./dataset/test_list.txt', test_list, fmt='%s')

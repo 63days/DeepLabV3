@@ -60,7 +60,7 @@ class Down(nn.Module):
         elif down_method == 'conv':
             self.downsample = nn.Conv2d(in_channels, in_channels, 2, stride=2, bias=False)
 
-        self.convs = DoubleConv(in_channels, out_channels, separab=separable)
+        self.convs = DoubleConv(in_channels, out_channels, separable=separable)
 
     def forward(self, x):
         x = self.downsample(x)

@@ -9,87 +9,58 @@ import torch.nn.functional as F
 import torch.nn as nn
 import random
 import matplotlib.pyplot as plt
-import torchvision.transforms.functional as TF
+import pickle
+import math
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class BoneDataset(Dataset):
 
-    def __init__(self, list_dir='./dataset', img_dir='./dataset/images', transform=None):
+    def __init__(self, list_dir='./dataset', data_dir='./dataset/tensor', train=True):
         self.list_dir = list_dir
-        self.img_dir = img_dir
-        self.transform = transform
-        self.img_list = np.genfromtxt(os.path.join(list_dir, 'filelist.txt'), dtype=str)
+        self.data_dir = data_dir
+        self.train = train
+        if train is True:
+            self.img_list = np.genfromtxt(os.path.join(list_dir, 'train_list.txt'), dtype=str)
+        else:
+            self.img_list = np.genfromtxt(os.path.join(list_dir, 'test_list.txt'), dtype=str)
 
     def __getitem__(self, idx):
         img_name = self.img_list[idx]
-
-        img = Image.open(self.img_dir+'/original/'+img_name).convert('L')
-        label = Image.open(self.img_dir+'/label/'+img_name).convert('L')
-
-        sample = (img, label)
-        if self.transform:
-            #transforms.RandomHorizontalFlip(p=0.5),
-            #transforms.RandomRotation(degrees=45),
-            #transforms.ToTensor(),
-
-            img = self.transform(img)
-            label = self.transform(label)
-
-
-            degrees = np.arange(-30, 30)
-            degree = np.random.choice(degrees)
-
-            img = TF.rotate(img, degree)
-            label = TF.rotate(label, degree)
-
-            img = TF.to_tensor(img)
-            label = TF.to_tensor(label)
-
-        label = label.long().float()
-        sample = (img, label)
-        #label_onehot = torch.zeros(2, label.size(1), label.size(2)).scatter_(0, label, 1)
-        #sample = (img, label_onehot)
-
+        sample = torch.load(os.path.join(self.data_dir, img_name))
         return sample
 
     def __len__(self):
         return self.img_list.shape[0]
 
 class DataSetWrapper(object):
-    def __init__(self, batch_size, num_workers, valid_ratio, test_ratio):
+    def __init__(self, batch_size, num_workers, valid_ratio):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.valid_ratio = valid_ratio
-        self.test_ratio = test_ratio
 
-    def get_data_loaders(self):
-        data_augment = self._bone_transform()
+    def get_data_loaders(self, train):
+        if train is True:
+            dataset = BoneDataset(train=train)
 
-        dataset = BoneDataset(transform=self._bone_transform())
+            train_dl, valid_dl = self.get_train_valid_loaders(dataset)
 
-        train_dl, valid_dl, test_dl = self.get_train_valid_test_loaders(dataset)
+            return train_dl, valid_dl
+        else:
+            dataset = BoneDataset(train=train)
+            test_dl = self.get_test_loader(dataset)
+            return test_dl
 
-        return train_dl, valid_dl, test_dl
-
-    def _bone_transform(self):
-        data_transforms = transforms.Compose([
-            SquarePad(),
-            transforms.Resize((572, 572))
-            #transforms.Normalize([0.485], [0.229])
-        ])
-        return data_transforms
-
-    def get_train_valid_test_loaders(self, dataset):
+    def get_train_valid_loaders(self, dataset):
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
-        split_1 = int(np.floor(self.valid_ratio * dataset_size))
-        split_2 = int(np.floor(self.test_ratio * dataset_size))
-        valid_indices, test_indices = indices[:split_1], indices[split_1: split_1+split_2]
-        train_indices = indices[split_1+split_2:]
-        train_sampler = SubsetRandomSampler(train_indices)
-        valid_sampler = SubsetRandomSampler(valid_indices)
-        test_sampler = SubsetRandomSampler(test_indices)
+        np.random.shuffle(indices)
+
+        split = int(np.floor(self.valid_ratio * dataset_size))
+        train_idx, valid_idx = indices[split:], indices[:split]
+
+        train_sampler = SubsetRandomSampler(train_idx)
+        valid_sampler = SubsetRandomSampler(valid_idx)
 
         train_dl = DataLoader(dataset, batch_size=self.batch_size, sampler=train_sampler,
                               num_workers=self.num_workers, shuffle=False, pin_memory=True)
@@ -97,10 +68,11 @@ class DataSetWrapper(object):
         valid_dl = DataLoader(dataset, batch_size=self.batch_size, sampler=valid_sampler,
                               num_workers=self.num_workers, shuffle=False, pin_memory=True)
 
-        test_dl = DataLoader(dataset, batch_size=self.batch_size, sampler=test_sampler,
-                              num_workers=self.num_workers, shuffle=False, pin_memory=True)
+        return train_dl, valid_dl
 
-        return train_dl, valid_dl, test_dl
+    def get_test_loader(self, dataset):
+        test_dl = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers,
+                             shuffle=False, pin_memory=True)
 
 class SquarePad(object):
     def __call__(self, img):
@@ -119,19 +91,3 @@ class Threshold(object):
     def __call__(self, img):
         return nn.Threshold(self.threshold, self.value)(img)
 
-
-if __name__ == '__main__':
-    print(device)
-    dataset = DataSetWrapper(batch_size=1, num_workers=1, valid_ratio=0.2, test_ratio=0.2)
-    train_dl, valid_dl, test_dl = dataset.get_data_loaders()
-
-    x, y = next(iter(train_dl))
-    print(y.size())
-    fig, ax = plt.subplots(1,2)
-    y=y.squeeze(0)
-    y=torch.argmax(y, 0)
-    ax[0].imshow(x.squeeze(), cmap='gray')
-    ax[0].axis('off')
-    ax[1].imshow(y, cmap='gray')
-    ax[1].axis('off')
-    plt.show()

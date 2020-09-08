@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from dataloader import DataSetWrapper
 from tqdm import tqdm
-from unet import Unet, CenterCrop
+from model import Unet, CenterCrop
 from utils import get_IOU, Padding
 def main(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -14,17 +14,17 @@ def main(args):
     batch_size = args.batch_size
     num_workers = args.num_workers
     valid_ratio = args.valid_ratio
-    test_ratio = args.test_ratio
     threshold = args.threshold
     separable = args.separable
-    method = args.method
-
+    down_method = args.down_method
+    up_method = args.up_method
     ### DataLoader ###
-    dataset = DataSetWrapper(batch_size, num_workers, valid_ratio, test_ratio)
-    train_dl, valid_dl, test_dl = dataset.get_data_loaders()
+    dataset = DataSetWrapper(batch_size, num_workers, valid_ratio)
+    train_dl, valid_dl = dataset.get_data_loaders(train=True)
 
     ### Model: U-Net ###
-    model = Unet(input_dim=1, separable=separable, method=method)
+    model = Unet(input_dim=1, separable=separable,
+                 down_method=down_method, up_method=up_method)
     model.summary()
     model = nn.DataParallel(model).to(device)
     
@@ -51,7 +51,7 @@ def main(args):
             optimizer.zero_grad()
             img, label = img.to(device), label.to(device)
             pred = model(img)
-            pred = Padding()(pred, label.size(3))
+            #pred = Padding()(pred, label.size(3))
             loss = criterion(pred, label)
             loss.backward()
             optimizer.step()
@@ -71,7 +71,7 @@ def main(args):
             for (img, label) in pbar:
                 img, label = img.to(device), label.to(device)
                 pred = model(img)
-                pred = Padding()(pred, label.size(3))
+
                 loss = criterion(pred, label)
 
                 mIOU.append(get_IOU(pred, label, threshold=threshold))
@@ -97,7 +97,7 @@ def main(args):
                 'val_losses': val_losses,
                 'best_mIOU': best_mIOU
             }
-            torch.save(save_state, f'./checkpoint/{method}_{separable}_best_model.ckpt')
+            torch.save(save_state, f'./checkpoint/{down_method}_{up_method}_{separable}.ckpt')
             step = 0
         else:
             step += 1
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=4
+        default=8
     )
     parser.add_argument(
         '--num_workers',
@@ -132,11 +132,6 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--valid_ratio',
-        type=float,
-        default=0.2
-    )
-    parser.add_argument(
-        '--test_ratio',
         type=float,
         default=0.2
     )
@@ -163,11 +158,17 @@ if __name__ == '__main__':
         help='Using Depth-Wise Separable Conv'
     )
     parser.add_argument(
-        '--method',
+        '--up_method',
         type=str,
-        default='upsample',
-        choices=['upsample', 'transpose'],
+        default='bilinear',
+        choices=['bilinear', 'transpose'],
         help='Upsample Method'
+    )
+    parser.add_argument(
+        '--down_method',
+        type=str,
+        default='maxpool',
+        choices=['maxpool', 'conv']
     )
     args = parser.parse_args()
     main(args)
