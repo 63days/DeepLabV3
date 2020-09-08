@@ -73,6 +73,7 @@ class DataSetWrapper(object):
     def get_test_loader(self, dataset):
         test_dl = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers,
                              shuffle=False, pin_memory=True)
+        return test_dl
 
 class SquarePad(object):
     def __call__(self, img):

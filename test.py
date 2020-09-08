@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import argparse
 import matplotlib.pyplot as plt
-from unet import Unet
+from model import Unet
 from tqdm import tqdm
 from dataloader import DataSetWrapper
 from utils import Padding, get_IOU
@@ -13,13 +13,15 @@ def main(args):
     up_method = args.up_method
     separable = args.separable
 
-    ds = DataSetWrapper(args.batch_size, 8, 0.2, 0.2)
+    ds = DataSetWrapper(args.batch_size, args.num_workers, 0.2)
     test_dl = ds.get_data_loaders(train=False)
 
-    model = Unet(1, method=args.method, separable=args.separable)
+    model = Unet(input_dim=1, separable=separable,
+                 down_method='maxpool', up_method='transpose')
     model = nn.DataParallel(model).to(device)
 
-    load_state = torch.load(f'./checkpoint/{down_method}_{up_method}_{separable}.ckpt')
+    #load_state = torch.load(f'./checkpoint/{down_method}_{up_method}_{separable}.ckpt')
+    load_state = torch.load(f'./checkpoint/maxpool_transpose_False.ckpt')
 
     model.load_state_dict(load_state['model_state_dict'])
     train_losses = load_state['train_losses']
