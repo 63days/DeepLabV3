@@ -127,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--patience',
         type=int,
-        default=200,
+        default=800,
         help='Early Stopping Criteria'
     )
     parser.add_argument(

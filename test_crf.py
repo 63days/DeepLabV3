@@ -6,11 +6,14 @@ from model import Unet
 from tqdm import tqdm
 from dataloader import DataSetWrapper
 from utils import Padding, get_IOU
-from PIL import Image
+import numpy as np
+import pydensecrf.densecrf as dcrf
 from torchvision import transforms
 
 def main(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    d = dcrf.DenseCRF2D(512, 512, 2)
 
     down_method = args.down_method
     up_method = args.up_method
