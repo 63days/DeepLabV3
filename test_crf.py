@@ -9,6 +9,7 @@ from utils import Padding, get_IOU
 import numpy as np
 import pydensecrf.densecrf as dcrf
 from torchvision import transforms
+from pydensecrf.utils import unary_from_softmax, create_pairwise_bilateral
 
 def main(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -19,7 +20,7 @@ def main(args):
     up_method = args.up_method
     separable = args.separable
 
-    ds = DataSetWrapper(args.batch_size, args.num_workers, 0.2)
+    ds = DataSetWrapper(1, args.num_workers, 0.2)
     test_dl = ds.get_data_loaders(train=False)
 
     model = Unet(input_dim=1, separable=True,
@@ -32,55 +33,43 @@ def main(args):
     model.load_state_dict(load_state['model_state_dict'])
     train_losses = load_state['train_losses']
     val_losses = load_state['val_losses']
-
+    map_list = []
     model.eval()
     with torch.no_grad():
-        pbar = tqdm(test_dl)
-        mIOU = []
-        img_list = []
-        label_list = []
-        pred_list = []
-        for (img, label) in pbar:
+        for (img, label) in test_dl:
             img, label = img.to(device), label.to(device)
             pred = model(img)
-            pred = Padding()(pred, label.size(3))
-            pred = (pred > 0.5).long()
-            mIOU.append(get_IOU(pred, label, threshold=0.5))
+            img, label, pred = img.squeeze(0), label.squeeze(0), pred.squeeze(0)
+            pred2 = torch.zeros(2, 512, 512).to(device)
+            index = torch.cat([torch.zeros(1,512, 512), torch.ones(1,512, 512)], dim=0).long().to(device)
+            pred2.scatter_(0, index, torch.cat([1-pred, pred], dim=0))
 
-            #img_list.append(img[2].cpu().numpy())
-            img_list += list(map(lambda x: transforms.ToPILImage()(x), img.cpu()))
-            #label_list.append(label[2].cpu().numpy())
-            label_list += list(map(lambda x: transforms.ToPILImage()(x), label.cpu()))
-            # pred_list.append(pred[2].cpu().numpy())
-            pred_list += list(map(lambda x: transforms.ToPILImage()(x), pred.cpu().float()))
+            U = pred2.cpu().numpy().transpose(2,0,1).reshape((2,-1)) # [2, 512*512]
+            U = np.where(a )
+            U = -np.log(U)
+            d.setUnaryEnergy(U)
+            print(U)
+            im = np.array(img.cpu(), dtype=np.uint8).transpose(1, 2, 0)
+            pairwise_energy = create_pairwise_bilateral(sdims=(10, 10), schan=(0.01,), img=im, chdim=2)
+            d.addPairwiseEnergy(pairwise_energy, compat=10)
+
+            Q = d.inference(5)
+            map = np.argmax(Q, axis=0).reshape((512, 512))
+            proba = np.array(Q)
+            print(proba)
+
+            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+            plt.subplots_adjust(top=1, bottom=0, hspace=0.01)
+            ax[0].imshow(img.cpu().numpy().transpose(1,2,0), cmap='gray')
+            ax[1].imshow(label.cpu().numpy().transpose(1,2,0), cmap='gray')
+            ax[2].imshow(map, cmap='gray')
+
+            plt.show()
+
+            break
 
 
 
-        # for i in range(len(img_list)):
-        #     img = img_list[i]
-        #     img.save(f'./results/{i+1}_orig.png')
-        #     label = label_list[i]
-        #     label.save(f'./results/{i+1}_label.png')
-        #     pred = pred_list[i]
-        #     pred.save(f'./results/{i+1}_pred.png')
-
-        mIOU = sum(mIOU) / len(mIOU)
-        print(f'mIOU: {mIOU*100:.2f}%')
-
-    length = len(img_list)
-    print(length)
-
-    fig, ax = plt.subplots(4, 3, figsize=(6, 10))
-    plt.subplots_adjust(top=1, bottom=0, hspace=0.01)
-    for i in range(4):
-        ax[i][0].imshow(img_list[i], cmap='gray')
-        ax[i][0].axis('off')
-        ax[i][1].imshow(label_list[i], cmap='gray')
-        ax[i][1].axis('off')
-        ax[i][2].imshow(pred_list[i], cmap='gray')
-        ax[i][2].axis('off')
-
-    plt.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Test the segmentation')
